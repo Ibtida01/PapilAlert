@@ -11,7 +11,7 @@ data/*duplicates.csv
 data/*invalid.csv
 data/*audit.json
 docs/*.md
-inference/
 Test_set/
 Test_set_2/
-
+presentation/
+results/
