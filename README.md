@@ -1,47 +1,110 @@
-# PapilAlert — Optic-Disc Workflow Research Prototype
+# PapilAlert
+### Optic-Disc Edema Workflow Research Prototype
 
-**Version:** 0.2.1  
-**Status:** Working web prototype + training/evaluation pipeline. **No trained clinical model is bundled.**  
-**Intended use:** Software demonstration and supervised research only. Not a medical device. Not for diagnosis, screening decisions, triage, or patient care.
+PapilAlert is a browser-based research prototype for reviewing retinal fundus photographs. It uses an image-classification model to estimate whether an image may show optic-disc edema (ODE), and provides a visual explanation of the regions that influenced the model's output.
 
-## The honest scope
+**Project status:** Working web prototype and training/evaluation pipeline  
+**Intended use:** Software demonstration and supervised research only  
+**Clinical status:** Not clinically validated. Not intended for diagnosis, screening decisions, triage, or patient care.
 
-PapilAlert is a browser-based workflow demonstrator for fundus photographs. It currently provides:
+---
 
-1. Still-image upload and display.
-2. Basic engineering checks for resolution, illumination, clipping, and a blur proxy.
-3. A local MobileNetV3-Small ODE classifier when the compatible checkpoint is installed.
-4. Abstention when a model score or top-two score margin falls below configured prototype thresholds.
-5. A Grad-CAM overlay for the ODE output class, clearly labelled as coarse model attention rather than lesion localisation.
-6. Dataset-level RFMiD 1.0 metrics and exploratory RFMiD 2.0 results, including limitations.
-7. No third-party LLM call and no intentional server-side image persistence.
-8. A responsive clinical-research interface with a dataset-metrics section and side-by-side original/Grad-CAM image evidence view. The upload endpoint returns a compact in-memory image preview data URL so the result panel does not depend on a temporary browser blob URL.
+## The problem
 
-The project **does not** presently provide validated papilledema detection, intracranial-pressure estimation, clinical urgency prediction, or a diagnosis. A normal smartphone selfie camera cannot photograph the retina; a fundus camera or compatible optical attachment is required.
+The optic disc is the point at the back of the eye where the optic nerve exits the retina. Swelling of this region is called optic-disc edema. It can be associated with several ocular or neurological conditions and may require further clinical assessment.
 
-### Critical dataset correction
+Reviewing retinal images requires appropriate imaging equipment and trained clinical interpretation. PapilAlert explores whether an image-classification model can help flag photographs for further review by an eye-care professional.
 
-The frequently cited 1,369-image dataset associated with Ahn et al. (2019) has 779 normal images, 295 pseudopapilledema images, and 295 **mixed optic-neuropathy** images. The paper says the mixed group contains 177 ischemic optic neuropathy, 48 optic neuritis, 17 diabetic optic neuropathy, **22 papilledema**, and 31 retinal-disorder cases. It is therefore incorrect to describe all 295 abnormal images as papilledema. On 2 November 2026, the publisher issued an Editorial Expression of Concern because the authors had not responded to requests for access to the dataset. See `docs/DATASET_AUDIT.md`.
+ODE is not synonymous with papilledema. Papilledema refers specifically to optic-disc swelling associated with raised intracranial pressure. PapilAlert does not determine the cause of swelling, diagnose papilledema, or estimate intracranial pressure.
 
-For these reasons, this repository does not download, redistribute, or bundle that dataset, does not ship weights trained on it, and does not present it as a clean papilledema benchmark. The training pipeline is intentionally generic and should be used only with image data whose provenance, labels, licensing, and patient-level identifiers have been checked.
+## What has been built
 
-## Current model evidence (important)
+The prototype combines a web interface, a FastAPI backend, image checks, a MobileNetV3-Small classifier, and a Grad-CAM explanation view.
 
-The current checkpoint's RFMiD 1.0 held-out test results were reproduced locally on all 640 test images: AUROC 0.96714, AUPRC 0.78492, sensitivity 70.59% (12/17), and specificity 99.84% (622/623) at threshold 0.50. The confusion matrix is TN=622, FP=1, FN=5, TP=12. There were only 17 ODE-positive test images, so sensitivity is imprecise.
+A user can:
 
-An exploratory RFMiD 2.0 external evaluation matched 170 images including four ODE-positive cases. It produced AUROC 0.8810, AUPRC 0.1560, sensitivity 0% and specificity 100% at threshold 0.50. Four image IDs and four ground-truth IDs were unmatched. These data are too limited to establish external generalisation.
+- Upload and view a retinal fundus photograph.
+- Receive basic image-quality checks for resolution, illumination, clipping, and a blur proxy.
+- Run a compatible MobileNetV3-Small checkpoint to obtain an ODE classification score.
+- See an abstention state when the configured prototype score or top-two score-margin thresholds are not met.
+- View the original image beside a Grad-CAM overlay for the ODE output class.
+- Review the model's dataset-level evaluation metrics and known limitations.
 
-The interface's Grad-CAM overlay shows coarse image regions that contributed to the model's ODE-class score. It is not an ODE lesion mask, optic-disc segmentation, anatomical boundary, or proof of disease. It is not clinically validated.
+Grad-CAM indicates image regions that contributed to the model's output. It is a coarse model-attention visualisation—not an ODE lesion mask, optic-disc segmentation, confirmed anatomical abnormality, or proof that ODE is present.
 
-## 1.1 Web interface update (0.2.1)
+The prototype does not call a third-party large language model. Uploaded images are processed in memory; the application does not intentionally persist them as part of its normal inference workflow.
 
-The page embeds its main stylesheet directly in `index.html`, uses a versioned JavaScript asset URL, and returns the original uploaded image as a compact preview data URL alongside Grad-CAM. These changes avoid an unstyled page when an external CSS request is stale or unavailable and avoid broken original-image previews caused by temporary browser object URLs. The stylesheet is also retained at `app/static/styles.css` for maintainability.
+## How it works
 
-After replacing the `app/` folder, stop the old server, restart it, and hard-refresh the browser with `Ctrl+F5`. The app is still a local research prototype, not a production or clinical service.
+1. **Image upload:** A retinal fundus photograph is submitted through the browser interface.
+2. **Image checks:** The backend measures basic technical properties such as image dimensions, illumination, clipping, and a blur proxy.
+3. **Preprocessing:** The image is converted and resized to the input format expected by the compatible model checkpoint.
+4. **Classification:** MobileNetV3-Small produces scores for two classes: `no_ode` and `optic_disc_edema`.
+5. **Abstention:** Configured prototype thresholds determine whether the output is shown as a model prediction or an abstention.
+6. **Explanation:** Grad-CAM generates a coarse attention overlay for the ODE output class.
 
-## 1. Run the web prototype (Windows 11)
+The model score is uncalibrated. It should not be interpreted as a patient's clinical probability or as a measure of disease severity.
 
-Use Python 3.11. From PowerShell in this folder:
+## Model and evaluation
+
+The classifier is based on **MobileNetV3-Small** and was trained as a two-class image classifier using the RFMiD 1.0 retinal fundus dataset. Evaluation uses a held-out test partition.
+
+### RFMiD 1.0 held-out test results
+
+| Metric | Result |
+|---|---:|
+| Test images | 640 |
+| ODE-positive images | 17 |
+| AUROC | 0.96714 |
+| AUPRC | 0.78492 |
+| Sensitivity at threshold 0.50 | 70.59% (12/17) |
+| Specificity at threshold 0.50 | 99.84% (622/623) |
+
+Confusion matrix (rows: ground truth; columns: prediction):
+
+|  | Predicted no ODE | Predicted ODE |
+|---|---:|---:|
+| Actual no ODE | 622 | 1 |
+| Actual ODE | 5 | 12 |
+
+The 17 positive cases make the sensitivity estimate imprecise. These results describe performance on this dataset split only; they do not establish clinical performance or performance on other cameras, populations, or settings.
+
+### Exploratory RFMiD 2.0 external evaluation
+
+| Metric | Result |
+|---|---:|
+| Matched images | 170 |
+| Matched ODE-positive images | 4 |
+| AUROC | 0.8810 |
+| AUPRC | 0.1560 |
+| Sensitivity at threshold 0.50 | 0% (0/4) |
+| Specificity at threshold 0.50 | 100% (166/166) |
+
+Four prediction IDs and four ground-truth IDs were unmatched. All four unmatched ground-truth records were labelled no ODE; all four positive cases were among the matched images. The small number of positive cases means this external evaluation is exploratory and cannot establish reliable external generalisation.
+
+The RFMiD 2.0 results also show that a high AUROC alone does not guarantee a useful operating threshold. At the 0.50 threshold, the model missed all four matched positive cases. Threshold changes must be selected using a separate validation set, not by tuning against the external test labels.
+
+## Data and responsible use
+
+- **Primary dataset:** RFMiD 1.0 retinal fundus images and associated labels.
+- **External evaluation:** RFMiD 2.0 test images and labels, used for an exploratory comparison.
+- **Data handling:** Dataset files are not included in this repository. Users should obtain them from their original sources and review the applicable terms before use or redistribution.
+- **Privacy:** Use public, de-identified research images for demonstrations. Do not upload identifiable patient images to an unapproved deployment.
+- **Label integrity:** ODE labels must not be treated as labels for papilledema or raised intracranial pressure.
+
+## Limitations and safeguards
+
+PapilAlert is an early-stage research prototype. It has not undergone prospective clinical validation, external multi-centre validation, reader studies, or regulatory review. Its image-quality checks are engineering checks, not clinically validated image-acceptance criteria. Its model scores are uncalibrated. Grad-CAM is not lesion localisation and may highlight features that are not clinically relevant.
+
+A normal smartphone selfie camera cannot photograph the retina. Retinal imaging requires a fundus camera or a compatible optical attachment. The prototype should only be demonstrated with suitable retinal fundus photographs.
+
+The application must not be used to make diagnosis, referral, treatment, screening, or urgency decisions. Any future clinical evaluation would require ophthalmologist oversight, appropriate datasets and patient-level data governance, prospective validation, device-specific testing, and relevant regulatory review.
+
+## Run the web prototype
+
+**Environment:** Python 3.11
+
+From the project root on Windows PowerShell:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -51,104 +114,40 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open <http://127.0.0.1:8000>.
+Open <http://127.0.0.1:8000> in a browser.
 
-Alternatively run `run_windows.bat`. The first installation of PyTorch can take time. For GPU training, install the PyTorch build appropriate for your NVIDIA driver/CUDA from the official PyTorch installation selector before installing the remaining requirements.
-
-## 2. Expected dataset layout
-
-The trainer expects class folders under `data/images/` or another directory you specify:
-
-```text
-data/
-  images/
-    normal/
-      image_001.jpg
-    pseudopapilledema/
-      image_002.jpg
-    optic_neuropathy_mixed/
-      image_003.jpg
-  manifest.csv
-```
-
-The exact class names are dataset-specific. Do not relabel a mixed `optic_neuropathy` folder as `papilledema`.
-
-Create the manifest:
-
-```powershell
-python -m training.prepare_dataset --input data/images --output data/manifest.csv --source-name "YOUR DATASET NAME" --license-status verified --label-note "Describe exactly how the labels were assigned."
-```
-
-`--license-status verified` is a declaration you make only after checking the original data terms. The script does not verify permissions. It removes exact duplicate files by SHA-256 hash, records unreadable files and writes an audit JSON. It cannot detect near-duplicates or verify clinical truth.
-
-If your source has a patient mapping file with columns `filename,patient_id`, provide it:
-
-```powershell
-python -m training.prepare_dataset --input data/images --output data/manifest.csv --patient-map data/patient_map.csv --source-name "YOUR DATASET" --license-status verified
-```
-
-Keep a patient map securely and do not include direct identifiers. Use coded pseudonymous IDs only where permitted.
-
-## 3. Train
-
-The trainer defaults to **patient-grouped splitting**. It will stop if patient IDs are missing. This is intentional: two eyes or repeated visits from the same person must not leak across train and test.
-
-```powershell
-python -m training.train --manifest data/manifest.csv --data-root data/images --output-dir runs/opticwatch --epochs 15 --batch-size 16
-```
-
-If patient IDs are unavailable, you can run an explicitly exploratory image-level split:
-
-```powershell
-python -m training.train --manifest data/manifest.csv --data-root data/images --output-dir runs/image-level-demo --epochs 8 --batch-size 8 --allow-image-level-split
-```
-
-**Do not present image-level results as patient-independent performance.** The checkpoint records the split type and the app labels its outputs as uncalibrated research scores.
-
-If ImageNet weights cannot be downloaded, the script falls back to random initialization. For a small medical dataset this is usually a poor choice; prefer a network-enabled environment and confirm the training log says pretrained weights were loaded.
-
-## 4. Evaluate the held-out test data
-
-```powershell
-python -m training.evaluate --split-manifest runs/opticwatch/split_manifest.csv --data-root data/images --checkpoint runs/opticwatch/best_checkpoint.pt --output-dir runs/opticwatch/evaluation
-```
-
-It saves `evaluation.json` and `confusion_matrix.png`. Report per-class sensitivity/recall, specificity where relevant, precision, macro-F1, confusion matrix, AUC (when defined), confidence intervals, and the exact split strategy. Accuracy alone is insufficient.
-
-## 5. Enable a model in the app
-
-Only after you have an appropriately licensed dataset and have completed the research checks, copy the selected checkpoint to:
+A compatible trained checkpoint is required for model inference. The source distribution does **not** bundle trained clinical model weights. To enable the classifier, place a compatible MobileNetV3-Small checkpoint at:
 
 ```text
 models/papilalert_mobilenet_v3_small.pt
 ```
 
-Restart the server. The app will attempt to load it. Class labels are taken from the checkpoint. The top score is an **uncalibrated model score**, not a clinical probability. With a compatible MobileNetV3-Small checkpoint, the result view also attempts to generate a Grad-CAM overlay for the `optic_disc_edema` output class.
+Then restart the application. Without a compatible checkpoint, the interface may still be used to inspect the workflow, but it cannot provide a trained-model prediction.
 
-## 6. Tests
+## Training and evaluation
 
-```powershell
-pytest -q
-```
+The repository includes scripts for dataset manifest preparation, model training, and held-out evaluation. The pipeline records dataset and split information and supports patient-grouped splitting when patient identifiers are available. Patient-level separation should be used to reduce leakage between training and evaluation. Image-level splits are exploratory only and should not be presented as patient-independent performance.
 
-## 7. Project structure
+See the training instructions and validation documentation in `docs/` before preparing a new dataset. Confirm image provenance, label definitions, licences, and permissions before use. Do not treat a mixed optic-neuropathy category as a papilledema class.
+
+## Project structure
 
 ```text
-app/                  FastAPI API, image QC and model loading
-app/static/           Responsive browser UI, metric dashboard and Grad-CAM evidence view
-training/             Dataset manifest, trainer and evaluator
-data/                 Empty data location + manifest template
-models/               Empty model location; no trained weights bundled
-docs/                 Data audit, model card, validation, pitch and demo guides
-presentation/         Pitch deck
-runs/                 Training outputs (not committed)
-tests/                Automated smoke tests
+app/                  FastAPI backend, image checks, model loading
+app/static/           Browser interface, styles, metrics and image views
+training/             Dataset preparation, training and evaluation scripts
+data/                 Dataset location and manifest template
+models/               Location for a separately supplied compatible checkpoint
+docs/                 Model card, dataset audit, references and validation notes
+presentation/         Project presentation
+runs/                 Local training outputs (not committed)
+tests/                Automated tests
 ```
 
-## 8. Competition warning
+## Further information
 
-The public Future Health Digital Innovation Challenge page says a working prototype and technical documentation (including assumptions and limitations) are due 20 November 2026. It lists ten statements across fertility, population health and wellbeing. The publicly rendered page fully exposes the Male Reproductive Health statement, which is not a direct match for PapilAlert. Before submitting, confirm that the challenge portal provides a population-health or wellbeing statement that explicitly permits an ophthalmic early-identification workflow. Do not claim confirmed challenge alignment until this has been checked.
+Project documentation is available in `docs/`, including the dataset audit, model card, validation protocol, technical explanation, references, and demonstration guide.
 
-## 9. References
+---
 
-See `docs/REFERENCES.md` and `docs/DATASET_AUDIT.md` for the primary research and challenge sources.
+**PapilAlert is a research workflow prototype. Its outputs require expert review and must not be used as clinical advice.**
