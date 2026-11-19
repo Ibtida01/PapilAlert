@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+models/*.md
+runs/**
+!runs/.gitkeep
+data/images/
+data/manifest.csv
+data/*duplicates.csv
+data/*invalid.csv
+data/*audit.json
+docs/*.md
+inference/
+Test_set/
+Test_set_2/
+

@@ -1,0 +1,4 @@
+image_path,label,patient_id,sha256,source_name,license_status
+images/normal/example_001.jpg,normal,anon_patient_001,,replace_with_dataset_name,verified
+images/pseudopapilledema/example_002.jpg,pseudopapilledema,anon_patient_002,,replace_with_dataset_name,verified
+images/optic_neuropathy_mixed/example_003.jpg,optic_neuropathy_mixed,anon_patient_003,,replace_with_dataset_name,verified
